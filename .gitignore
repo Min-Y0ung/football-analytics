@@ -1,0 +1,17 @@
+# data (downloaded, not versioned)
+data/
+*.db
+*.sqlite
+*.pkl
+*.npz
+
+# python
+__pycache__/
+*.egg-info/
+.venv/
+.ipynb_checkpoints/
+.pytest_cache/
+
+# outputs
+runs/
+checkpoints/
