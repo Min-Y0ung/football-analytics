@@ -1,0 +1,7 @@
+numpy>=1.26
+pandas>=2.1
+matplotlib>=3.8
+pytest>=8.0
+# Phase 3 (ST-GNN): install matching your CUDA version
+# torch>=2.3
+# torch_geometric>=2.5
