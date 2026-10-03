@@ -17,7 +17,7 @@ The RQ1 model doubles as the counterfactual baseline for RQ2.
 
 ```
 Metrica raw (25 Hz, normalized)  ->  metres, centre origin, y up
-  -> home always attacks +x  ->  glitch removal (> 12 m/s)  ->  0.5 s smoothing
+  -> home always attacks +x  ->  glitch removal (> 12 m/s)  ->  (optional smoothing, off)
   -> uniform 10 Hz resampling  ->  velocities
   -> SQLite (matches / players / frames / positions / events)
   -> 6 s windows (4 s in, 2 s out), 23 nodes (11 + 11 + ball)  ->  models
@@ -26,22 +26,26 @@ Metrica raw (25 Hz, normalized)  ->  metres, centre origin, y up
 ## Quick start
 
 ```bash
-pip install -e .            # or: pip install -r requirements.txt
+pip install -e '.[ml]'      # or: pip install -r requirements.txt  (drop [ml] for data only)
 bash scripts/download_metrica.sh          # 3 open matches -> data/metrica
 python scripts/build_db.py                # -> data/football.db (~170k frames, 3.8M positions)
 python scripts/run_baselines.py           # RQ1 baselines
+python scripts/train_lstm.py              # per-player LSTM, leave-one-match-out (~15 min on Apple MPS)
 pytest                                    # synthetic-data tests, no download needed
 ```
 
-## Results so far (RQ1 baselines, 2 s horizon, players only)
+## Results so far (RQ1, 2 s horizon, players only, leave-one-match-out)
 
-| Match | Windows | Stationary ADE / FDE | Constant velocity ADE / FDE |
-|---|---|---|---|
-| metrica_1 | 2,730 | 2.25 / 4.21 m | 0.71 / 1.84 m |
-| metrica_2 | 2,500 | 2.28 / 4.27 m | 0.73 / 1.90 m |
-| metrica_3 | 3,071 | 2.33 / 4.35 m | 0.80 / 2.07 m |
+| Held-out match | Windows | Stationary ADE / FDE | Constant velocity ADE / FDE | Per-player LSTM ADE / FDE |
+|---|---|---|---|---|
+| metrica_1 | 2,733 | 2.26 / 4.22 m | 0.72 / 1.86 m | 0.43 / 1.18 m |
+| metrica_2 | 2,483 | 2.29 / 4.28 m | 0.75 / 1.93 m | 0.45 / 1.24 m |
+| metrica_3 | 3,059 | 2.33 / 4.36 m | 0.82 / 2.11 m | 0.55 / 1.48 m |
+| **mean** | 8,275 | 2.29 / 4.29 m | 0.76 / 1.97 m | **0.48 / 1.30 m** |
 
-Learned models will be evaluated leave-one-match-out.
+The LSTM (`python scripts/train_lstm.py`, 40 epochs, still improving at the end) sees each player alone,
+so it is the reference the graph models must beat. Smoothing is off: a centred 0.5 s moving average
+leaked future frames into the inputs and made the LSTM look better than it is (0.36 / 1.07 m).
 
 ## Data
 
@@ -58,16 +62,19 @@ src/stfootball/
   db.py           SQLite schema, loader, event-window queries
   windows.py      fixed-size 23-node sliding windows
   baselines.py    stationary, constant velocity
+  models/lstm.py  per-player LSTM baseline
+  train.py        training loop, train/val split with overlap gap
   metrics.py      ADE, FDE
-scripts/          download, build_db, run_baselines
-tests/            pipeline tests on a synthetic match
+scripts/          download, build_db, run_baselines, train_lstm
+tests/            pipeline and model tests on synthetic data
 docs/             data notes and figures
 ```
 
 ## Roadmap
 
 - [x] Data loaders, cleaning, SQLite store, baselines
-- [ ] LSTM / Transformer per-player baselines
+- [x] Per-player LSTM baseline
+- [ ] Transformer per-player baseline
 - [ ] Graph construction (complete / kNN / pass-availability edges) + GCN-TCN in PyTorch Geometric
 - [ ] Pitch control (Spearman 2018) and location value
 - [ ] Virtual tactical simulation and Space Creation Value

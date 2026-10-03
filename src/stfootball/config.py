@@ -10,7 +10,9 @@ class Config:
     target_fps: int = 10
     # cleaning
     max_speed: float = 12.0  # m/s; faster jumps are treated as tracking glitches
-    smooth_window_s: float = 0.5
+    # centred smoothing leaks up to half a window of the future into model inputs;
+    # off by default (Metrica raw tracks are clean enough: constant velocity ADE 0.75 -> 0.76 m)
+    smooth_window_s: float = 0.0
     # windows (RQ1: 4s observed -> 2s predicted)
     input_s: float = 4.0
     output_s: float = 2.0
