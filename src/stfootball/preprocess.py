@@ -86,7 +86,9 @@ def remove_glitches(trk: pd.DataFrame, cfg: Config = DEFAULT) -> pd.DataFrame:
 
 
 def smooth(trk: pd.DataFrame, cfg: Config = DEFAULT) -> pd.DataFrame:
-    """Centered moving average per period (players only; the ball moves too fast to smooth)."""
+    """Centered moving average per period (players only; the ball moves too fast to smooth).
+
+    Uses future frames, so keep it off for prediction inputs (window 0 = no-op)."""
     out = trk.copy()
     xs, ys = xy_columns(out)
     cols = [c for c in xs + ys if not c.startswith("ball")]

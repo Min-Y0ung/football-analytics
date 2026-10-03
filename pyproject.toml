@@ -9,6 +9,9 @@ description = "Spatio-temporal GNN trajectory prediction and space creation valu
 requires-python = ">=3.10"
 dependencies = ["numpy>=1.26", "pandas>=2.1", "matplotlib>=3.8"]
 
+[project.optional-dependencies]
+ml = ["torch>=2.2", "torch_geometric>=2.5"]
+
 [tool.setuptools.packages.find]
 where = ["src"]
 
