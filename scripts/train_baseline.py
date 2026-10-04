@@ -1,10 +1,12 @@
-"""Per-player learned baselines (LSTM / Transformer), leave-one-match-out, vs constant velocity.
+"""Learned RQ1 models, leave-one-match-out, vs constant velocity.
 
     python scripts/train_baseline.py --model lstm
     python scripts/train_baseline.py --model transformer
+    python scripts/train_baseline.py --model gcn_tcn --graph complete   # or knn / none
 
-Writes ADE/FDE per match to runs/<model>_lomo.csv and the per-step error curve
-to runs/<model>_horizon.npz (plot with scripts/plot_horizon.py).
+Writes ADE/FDE per match to runs/<name>_lomo.csv and the per-step error curve
+to runs/<name>_horizon.npz (plot with scripts/plot_horizon.py), where <name> is the
+model, plus the graph for gcn_tcn (e.g. gcn_tcn_knn).
 """
 import argparse
 import csv
@@ -15,18 +17,21 @@ import numpy as np
 
 from stfootball.baselines import constant_velocity
 from stfootball.config import DEFAULT
+from stfootball.graphs import GRAPHS
 from stfootball.io.metrica import load_all
 from stfootball.metrics import ade, fde, horizon_error
+from stfootball.models.gcn_tcn import GCNTCN
 from stfootball.models.lstm import PlayerLSTM
 from stfootball.models.transformer import PlayerTransformer
 from stfootball.preprocess import preprocess
 from stfootball.train import TrainConfig, fit, predict
 from stfootball.windows import WindowSet, make_windows
 
-MODELS = {"lstm": PlayerLSTM, "transformer": PlayerTransformer}
+MODELS = {"lstm": PlayerLSTM, "transformer": PlayerTransformer, "gcn_tcn": GCNTCN}
 
 ap = argparse.ArgumentParser()
 ap.add_argument("--model", choices=MODELS, default="lstm")
+ap.add_argument("--graph", choices=GRAPHS, default="complete", help="edges for gcn_tcn")
 ap.add_argument("--data", default="data/metrica/data")
 ap.add_argument("--cache", default="data/windows")
 ap.add_argument("--epochs", type=int, default=TrainConfig.epochs)
@@ -37,6 +42,12 @@ ap.add_argument("--smooth-s", type=float, default=DEFAULT.smooth_window_s,
 ap.add_argument("--out-dir", default="runs")
 args = ap.parse_args()
 cfg = replace(DEFAULT, smooth_window_s=args.smooth_s)
+name = f"{args.model}_{args.graph}" if args.model == "gcn_tcn" else args.model
+
+
+def build(t_out: int):
+    kwargs = {"graph": args.graph} if args.model == "gcn_tcn" else {}
+    return MODELS[args.model](t_out, **kwargs)
 
 
 def load_windows() -> list[WindowSet]:
@@ -59,23 +70,23 @@ t_out = int(cfg.output_s * cfg.target_fps)
 rows, curves = [], {}
 for test in sets:
     print(f"held out {test.match_id}", flush=True)
-    model = fit(MODELS[args.model](t_out), [w for w in sets if w is not test], tc, cfg)
-    for name, pred in (("constant_velocity", constant_velocity(test.X, t_out, cfg.target_fps)),
-                       (args.model, predict(model, test.X, device=args.device))):
-        rows.append((test.match_id, name, len(test.X), ade(pred, test.Y), fde(pred, test.Y)))
-        curves[f"{name}/{test.match_id}"] = horizon_error(pred, test.Y)
+    model = fit(build(t_out), [w for w in sets if w is not test], tc, cfg)
+    for label, pred in (("constant_velocity", constant_velocity(test.X, t_out, cfg.target_fps)),
+                        (name, predict(model, test.X, device=args.device))):
+        rows.append((test.match_id, label, len(test.X), ade(pred, test.Y), fde(pred, test.Y)))
+        curves[f"{label}/{test.match_id}"] = horizon_error(pred, test.Y)
 
 print(f"\n{'match':12s} {'model':18s} {'windows':>8s} {'ADE(m)':>7s} {'FDE(m)':>7s}")
 for r in rows:
     print(f"{r[0]:12s} {r[1]:18s} {r[2]:8d} {r[3]:7.2f} {r[4]:7.2f}")
-for name in ("constant_velocity", args.model):
-    sel = [r for r in rows if r[1] == name]
-    print(f"{'mean':12s} {name:18s} {sum(r[2] for r in sel):8d} "
+for m in ("constant_velocity", name):
+    sel = [r for r in rows if r[1] == m]
+    print(f"{'mean':12s} {m:18s} {sum(r[2] for r in sel):8d} "
           f"{np.mean([r[3] for r in sel]):7.2f} {np.mean([r[4] for r in sel]):7.2f}")
 
 out = Path(args.out_dir)
 out.mkdir(parents=True, exist_ok=True)
-with open(out / f"{args.model}_lomo.csv", "w", newline="") as f:
+with open(out / f"{name}_lomo.csv", "w", newline="") as f:
     csv.writer(f).writerows([("match", "model", "windows", "ade", "fde"), *rows])
-np.savez(out / f"{args.model}_horizon.npz", **curves)
-print(f"saved {out}/{args.model}_lomo.csv, {out}/{args.model}_horizon.npz")
+np.savez(out / f"{name}_horizon.npz", **curves)
+print(f"saved {out}/{name}_lomo.csv, {out}/{name}_horizon.npz")
