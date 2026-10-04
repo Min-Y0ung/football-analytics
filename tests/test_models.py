@@ -1,4 +1,4 @@
-"""LSTM baseline tests on synthetic windows (skipped without the `ml` extra)."""
+"""Learned baseline tests on synthetic windows (skipped without the `ml` extra)."""
 import numpy as np
 import pytest
 
@@ -6,6 +6,8 @@ torch = pytest.importorskip("torch")
 
 from stfootball.config import Config  # noqa: E402
 from stfootball.models.lstm import PlayerLSTM  # noqa: E402
+from stfootball.models.transformer import PlayerTransformer  # noqa: E402
+from stfootball.metrics import ade, fde, horizon_error  # noqa: E402
 from stfootball.train import TrainConfig, fit, predict, split_train_val  # noqa: E402
 from stfootball.windows import WindowSet  # noqa: E402
 
@@ -47,3 +49,17 @@ def test_fit_learns_linear_motion():
     before = np.linalg.norm(test.X[:, -1:, :22, :2] - test.Y[:, :, :22], axis=-1).mean()
     after = np.linalg.norm(predict(model, test.X, device="cpu") - test.Y[:, :, :22], axis=-1).mean()
     assert after < 0.5 * before, (before, after)
+
+
+def test_transformer_forward_shape():
+    model = PlayerTransformer(T_OUT, t_in=T_IN, d_model=32, heads=2, layers=1, ff=64)
+    X = torch.as_tensor(linear_windows(3).X[:, :, :22], dtype=torch.float32)
+    assert model(X).shape == (3, T_OUT, 22, 2)
+
+
+def test_horizon_error_matches_ade_and_fde():
+    w = linear_windows(10)
+    pred = np.repeat(w.X[:, -1:, :, :2], T_OUT, axis=1)
+    curve = horizon_error(pred, w.Y)
+    assert curve.shape == (T_OUT,)
+    assert np.isclose(curve.mean(), ade(pred, w.Y)) and np.isclose(curve[-1], fde(pred, w.Y))
