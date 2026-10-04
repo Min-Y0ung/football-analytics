@@ -63,3 +63,27 @@ def test_horizon_error_matches_ade_and_fde():
     curve = horizon_error(pred, w.Y)
     assert curve.shape == (T_OUT,)
     assert np.isclose(curve.mean(), ade(pred, w.Y)) and np.isclose(curve[-1], fde(pred, w.Y))
+
+
+def test_adjacency_kinds():
+    from stfootball.graphs import adjacency
+    pos = torch.randn(2, 5, 23, 2) * 20
+    assert adjacency(pos, "none").sum() == 0
+    full = adjacency(pos, "complete")
+    assert full.shape == (2, 5, 23, 23) and full[0, 0].sum() == 23 * 22
+    knn = adjacency(pos, "knn", k=4)
+    assert torch.equal(knn, knn.transpose(-1, -2))
+    assert (knn.diagonal(dim1=-2, dim2=-1) == 0).all() and (knn.sum(-1) >= 4).all()
+
+
+def test_gcn_tcn_shape_and_interaction_ablation():
+    from stfootball.models.gcn_tcn import GCNTCN
+    X = torch.as_tensor(linear_windows(2).X, dtype=torch.float32)  # all 23 nodes
+    X2 = X.clone(); X2[:, :, 15, :2] += 5.0                         # move one away player
+    for graph, shared in (("none", False), ("complete", True)):
+        torch.manual_seed(0)
+        model = GCNTCN(T_OUT, graph=graph, hidden=16, dilations=(1, 2)).eval()
+        out, out2 = model(X), model(X2)
+        assert out.shape == (2, T_OUT, 22, 2)
+        changed = not torch.allclose(out[:, :, 0], out2[:, :, 0])  # did home player 0 notice?
+        assert changed == shared, graph

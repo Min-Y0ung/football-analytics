@@ -1,4 +1,5 @@
-"""Training loop shared by the learned RQ1 models (players only, ball is input-free here).
+"""Training loop shared by the learned RQ1 models. Loss and outputs cover the 22 players;
+models with `uses_ball = True` (graph models) also get the ball node as input.
 
 Validation windows are the last `val_frac` of each training match, separated from the
 training part by a gap so overlapping windows never sit on both sides of the split.
@@ -16,6 +17,10 @@ from .config import DEFAULT, Config
 from .windows import WindowSet
 
 PLAYERS = slice(0, 22)
+
+
+def input_nodes(model: torch.nn.Module) -> slice:
+    return slice(None) if getattr(model, "uses_ball", False) else PLAYERS
 
 
 @dataclass(frozen=True)
@@ -68,7 +73,8 @@ def _flip(X: torch.Tensor, Y: torch.Tensor):
 def predict(model: torch.nn.Module, X: np.ndarray, batch_size: int = 256, device: str = "auto") -> np.ndarray:
     dev = pick_device(device)
     model.to(dev).eval()
-    out = [model(torch.as_tensor(X[i:i + batch_size, :, PLAYERS], dtype=torch.float32, device=dev)).cpu().numpy()
+    nodes = input_nodes(model)
+    out = [model(torch.as_tensor(X[i:i + batch_size, :, nodes], dtype=torch.float32, device=dev)).cpu().numpy()
            for i in range(0, len(X), batch_size)]
     return np.concatenate(out)
 
@@ -79,7 +85,7 @@ def fit(model: torch.nn.Module, train_sets: list[WindowSet], tc: TrainConfig = T
     rng = np.random.default_rng(tc.seed)
     dev = pick_device(tc.device)
     (Xtr, Ytr), (Xva, Yva) = split_train_val(train_sets, tc.val_frac, cfg)
-    Xtr = torch.as_tensor(Xtr[:, :, PLAYERS], dtype=torch.float32)
+    Xtr = torch.as_tensor(Xtr[:, :, input_nodes(model)], dtype=torch.float32)
     Ytr = torch.as_tensor(Ytr[:, :, PLAYERS], dtype=torch.float32)
     model.to(dev)
     opt = torch.optim.AdamW(model.parameters(), lr=tc.lr, weight_decay=tc.weight_decay)

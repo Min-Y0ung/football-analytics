@@ -32,23 +32,34 @@ python scripts/build_db.py                # -> data/football.db (~170k frames, 3
 python scripts/run_baselines.py           # RQ1 baselines
 python scripts/train_baseline.py --model lstm         # per-player LSTM, leave-one-match-out (~25 min on Apple MPS)
 python scripts/train_baseline.py --model transformer  # per-player Transformer (~45 min)
+python scripts/train_baseline.py --model gcn_tcn --graph complete  # GCN-TCN; also knn / none (~25 min each)
 python scripts/plot_horizon.py                        # error vs horizon figure from runs/
 pytest                                    # synthetic-data tests, no download needed
 ```
 
 ## Results so far (RQ1, 2 s horizon, players only, leave-one-match-out)
 
-| Held-out match | Windows | Stationary | Constant velocity | Per-player LSTM | Per-player Transformer |
-|---|---|---|---|---|---|
-| metrica_1 | 2,733 | 2.26 / 4.22 | 0.72 / 1.86 | 0.43 / 1.19 | 0.47 / 1.28 |
-| metrica_2 | 2,483 | 2.29 / 4.28 | 0.75 / 1.93 | 0.45 / 1.24 | 0.48 / 1.30 |
-| metrica_3 | 3,059 | 2.33 / 4.36 | 0.82 / 2.11 | 0.55 / 1.48 | 0.57 / 1.51 |
-| **mean** | 8,275 | 2.29 / 4.29 | 0.76 / 1.97 | **0.47 / 1.30** | 0.50 / 1.36 |
+ADE / FDE in metres per held-out match.
 
-ADE / FDE in metres. Both learned baselines see each player alone (`python scripts/train_baseline.py --model lstm|transformer`,
-up to 80 epochs with early stopping, one seed), so they are the reference the graph models must beat.
-Swapping recurrence for attention does not help on 4 s histories; the gain has to come from player interactions.
-Smoothing is off: a centred 0.5 s moving average leaked future frames into the inputs and made the LSTM look better than it is (0.36 / 1.07 m).
+| Model | Interactions | metrica_1 | metrica_2 | metrica_3 | **mean** |
+|---|---|---|---|---|---|
+| Stationary | - | 2.26 / 4.22 | 2.29 / 4.28 | 2.33 / 4.36 | 2.29 / 4.29 |
+| Constant velocity | - | 0.72 / 1.86 | 0.75 / 1.93 | 0.82 / 2.11 | 0.76 / 1.97 |
+| Per-player LSTM | no | 0.43 / 1.19 | 0.45 / 1.24 | 0.55 / 1.48 | **0.47** / 1.30 |
+| Per-player Transformer | no | 0.47 / 1.28 | 0.48 / 1.30 | 0.57 / 1.51 | 0.50 / 1.36 |
+| GCN-TCN, no edges | no | 0.46 / 1.26 | 0.48 / 1.32 | 0.58 / 1.52 | 0.51 / 1.37 |
+| GCN-TCN, kNN (k = 4) | yes | 0.44 / 1.21 | 0.46 / 1.24 | 0.56 / 1.47 | 0.49 / 1.31 |
+| GCN-TCN, complete | yes | 0.43 / 1.17 | 0.45 / 1.22 | 0.55 / 1.44 | 0.48 / **1.27** |
+
+Windows per match: 2,733 / 2,483 / 3,059. Learned models: `python scripts/train_baseline.py --model lstm|transformer|gcn_tcn [--graph none|knn|complete]`,
+up to 80 epochs with early stopping, one seed.
+
+- **Interactions help.** The GCN-TCN with edges beats the same network without edges in every held-out match
+  (complete: ADE -0.03 m, FDE -0.10 m). This is the RQ1 comparison.
+- Against the per-player LSTM, the complete-graph GCN-TCN ties on ADE and is better on FDE in every match,
+  with a quarter of the parameters (74k vs 287k).
+- Swapping recurrence for attention (LSTM -> Transformer) does not help on 4 s histories.
+- Smoothing is off: a centred 0.5 s moving average leaked future frames into the inputs and made the LSTM look better than it is (0.36 / 1.07 m).
 
 ![error vs horizon](docs/figures/fig3_horizon_error.png)
 
@@ -67,7 +78,8 @@ src/stfootball/
   db.py           SQLite schema, loader, event-window queries
   windows.py      fixed-size 23-node sliding windows
   baselines.py    stationary, constant velocity
-  models/         per-player LSTM and Transformer baselines
+  graphs.py       per-step adjacency: none / complete / kNN
+  models/         per-player LSTM and Transformer baselines, GCN-TCN
   train.py        training loop, train/val split with overlap gap
   metrics.py      ADE, FDE, error per horizon step
 scripts/          download, build_db, run_baselines, train_baseline, plot_horizon
@@ -80,7 +92,8 @@ docs/             data notes and figures
 - [x] Data loaders, cleaning, SQLite store, baselines
 - [x] Per-player LSTM baseline
 - [x] Transformer per-player baseline
-- [ ] Graph construction (complete / kNN / pass-availability edges) + GCN-TCN in PyTorch Geometric
+- [x] Graph construction (complete / kNN) + GCN-TCN in PyTorch Geometric
+- [ ] Pass-availability edges, larger GCN-TCN, multiple seeds
 - [ ] Pitch control (Spearman 2018) and location value
 - [ ] Virtual tactical simulation and Space Creation Value
 - [ ] Extension: graph Neural ODE for continuous-time trajectories

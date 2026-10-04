@@ -8,7 +8,7 @@ counterfactual "virtual tactical simulation" (RQ2). Reply to the owner in Korean
 - `pip install -e '.[ml]'` (torch + PyG) then `bash scripts/download_metrica.sh` (data goes to `data/`, gitignored)
 - `python scripts/build_db.py` builds `data/football.db` (SQLite)
 - `python scripts/run_baselines.py` prints ADE/FDE per match
-- `python scripts/train_baseline.py --model lstm|transformer` trains per-player baselines leave-one-match-out (windows cached in `data/windows/`); `python scripts/plot_horizon.py` plots error vs horizon
+- `python scripts/train_baseline.py --model lstm|transformer|gcn_tcn [--graph none|knn|complete]` trains RQ1 models leave-one-match-out (windows cached in `data/windows/`); `python scripts/plot_horizon.py` plots error vs horizon
 - `pytest` runs synthetic-data tests (no download needed); run before every commit
 
 ## Conventions
@@ -23,6 +23,8 @@ counterfactual "virtual tactical simulation" (RQ2). Reply to the owner in Korean
 - Keep personal documents (application, schedule) out of this public repo.
 
 ## Next steps
-Baselines to beat (ADE/FDE): constant velocity 0.76/1.97 m, per-player LSTM 0.47/1.30 m, Transformer 0.50/1.36 m.
-1. Graph construction (complete / kNN / pass-availability) + GCN-TCN
+Current ADE/FDE: constant velocity 0.76/1.97 m, per-player LSTM 0.47/1.30 m, Transformer 0.50/1.36 m,
+GCN-TCN none/kNN/complete 0.51/1.37, 0.49/1.31, 0.48/1.27 m. GCN uses a separate root weight; with
+GCN self-loops the complete graph underfit (0.64/1.60 m).
+1. Pass-availability edges; scale GCN-TCN up; repeat with several seeds
 2. Pitch control (Spearman 2018) + location value grid -> Space Creation Value
