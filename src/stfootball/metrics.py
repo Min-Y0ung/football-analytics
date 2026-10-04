@@ -9,3 +9,8 @@ def ade(pred: np.ndarray, true: np.ndarray, nodes=slice(0, 22)) -> float:
 def fde(pred: np.ndarray, true: np.ndarray, nodes=slice(0, 22)) -> float:
     """Final displacement error in metres at the last future step."""
     return float(np.linalg.norm(pred[:, -1, nodes] - true[:, -1, nodes], axis=-1).mean())
+
+
+def horizon_error(pred: np.ndarray, true: np.ndarray, nodes=slice(0, 22)) -> np.ndarray:
+    """Mean displacement error per future step, shape (T_out,); its mean is ADE, its last value FDE."""
+    return np.linalg.norm(pred[:, :, nodes] - true[:, :, nodes], axis=-1).mean(axis=(0, 2))

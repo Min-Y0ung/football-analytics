@@ -8,10 +8,11 @@ counterfactual "virtual tactical simulation" (RQ2). Reply to the owner in Korean
 - `pip install -e '.[ml]'` (torch + PyG) then `bash scripts/download_metrica.sh` (data goes to `data/`, gitignored)
 - `python scripts/build_db.py` builds `data/football.db` (SQLite)
 - `python scripts/run_baselines.py` prints ADE/FDE per match
-- `python scripts/train_lstm.py` trains the per-player LSTM leave-one-match-out (windows cached in `data/windows/`)
+- `python scripts/train_baseline.py --model lstm|transformer` trains per-player baselines leave-one-match-out (windows cached in `data/windows/`); `python scripts/plot_horizon.py` plots error vs horizon
 - `pytest` runs synthetic-data tests (no download needed); run before every commit
 
 ## Conventions
+- Write PR descriptions with a Korean section first, English below.
 - Coordinates: metres, origin at centre spot, x towards the right goal, y up; home always attacks +x.
 - No centred smoothing on model inputs (it leaks future frames). Tracking is resampled to a uniform 10 Hz grid; `frame` keeps the nearest raw 25 Hz frame id for joining events.
 - Windows: 4 s in -> 2 s out, 23 nodes (11 home, 11 away, ball), node order fixed per window in `windows.py`.
@@ -22,6 +23,6 @@ counterfactual "virtual tactical simulation" (RQ2). Reply to the owner in Korean
 - Keep personal documents (application, schedule) out of this public repo.
 
 ## Next steps
-1. Transformer per-player baseline (LSTM done: ADE/FDE 0.48/1.30 m vs constant velocity 0.76/1.97 m)
-2. Graph construction (complete / kNN / pass-availability) + GCN-TCN
-3. Pitch control (Spearman 2018) + location value grid -> Space Creation Value
+Baselines to beat (ADE/FDE): constant velocity 0.76/1.97 m, per-player LSTM 0.47/1.30 m, Transformer 0.50/1.36 m.
+1. Graph construction (complete / kNN / pass-availability) + GCN-TCN
+2. Pitch control (Spearman 2018) + location value grid -> Space Creation Value
