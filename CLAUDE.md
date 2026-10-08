@@ -8,7 +8,7 @@ counterfactual "virtual tactical simulation" (RQ2). Reply to the owner in Korean
 - `pip install -e '.[ml]'` (torch + PyG) then `bash scripts/download_metrica.sh` (data goes to `data/`, gitignored)
 - `python scripts/build_db.py` builds `data/football.db` (SQLite)
 - `python scripts/run_baselines.py` prints ADE/FDE per match
-- `python scripts/train_baseline.py --model lstm|transformer|gcn_tcn [--graph none|knn|complete]` trains RQ1 models leave-one-match-out (windows cached in `data/windows/`); `python scripts/plot_horizon.py` plots error vs horizon
+- `python scripts/train_baseline.py --model lstm|transformer|gcn_tcn [--graph none|knn|complete] [--seed k --out-dir runs/seeds/seedk]` trains RQ1 models leave-one-match-out (windows cached in `data/windows/`); `python scripts/plot_horizon.py` plots error vs horizon; `python scripts/summarize_seeds.py` gives mean ± std over seeds
 - `pytest` runs synthetic-data tests (no download needed); run before every commit
 
 ## Conventions
@@ -23,8 +23,9 @@ counterfactual "virtual tactical simulation" (RQ2). Reply to the owner in Korean
 - Keep personal documents (application, schedule) out of this public repo.
 
 ## Next steps
-Current ADE/FDE: constant velocity 0.76/1.97 m, per-player LSTM 0.47/1.30 m, Transformer 0.50/1.36 m,
-GCN-TCN none/kNN/complete 0.51/1.37, 0.49/1.31, 0.48/1.27 m. GCN uses a separate root weight; with
+Current ADE/FDE (mean of seeds 0-2): constant velocity 0.76/1.97 m, per-player LSTM 0.474/1.298 m,
+Transformer 0.50/1.36 m (seed 0 only), GCN-TCN none/kNN/complete 0.509/1.374, 0.491/1.313, 0.482/1.284 m.
+Edges beat no edges in all 9 seed x match pairs; complete GCN-TCN vs LSTM is a tie (within 0.02 m). GCN uses a separate root weight; with
 GCN self-loops the complete graph underfit (0.64/1.60 m).
-1. Pass-availability edges; scale GCN-TCN up; repeat with several seeds
+1. Pass-availability edges; scale GCN-TCN up (report 3 seeds for new models)
 2. Pitch control (Spearman 2018) + location value grid -> Space Creation Value
